@@ -22,6 +22,9 @@ public class UniverseArtistDto {
     // Artist name;
     private String name;
 
+    // Artist Rank in Universe
+    private Integer topArtistRank;
+
     // List of Artist Images
     private List<ImageDto> images = new ArrayList<>();
 

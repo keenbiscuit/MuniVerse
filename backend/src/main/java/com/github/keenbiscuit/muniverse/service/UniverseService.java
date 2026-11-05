@@ -31,19 +31,8 @@ public class UniverseService {
     }
 
     // Method to organize universe ownership
-    public Map<String, Map<String, List<TracksDto>>> groupUniverse()
+    public Map<String, Map<String, List<TracksDto>>> groupUniverse(List<TracksDto> topTracks, List<ArtistDto> topArtists)
     {
-        // Fetch track dto
-        TopTracksResponseDto topTracksDto = spotifyService.fetchTopTracks();
-
-        // Fetch track items
-        List<TracksDto> items = topTracksDto.getItems();
-
-        // Fetch top artists
-        TopArtistsResponseDto topArtistsDto = spotifyService.fetchArtists();
-
-        // Feth artist items
-        List<ArtistDto> topArtists = topArtistsDto.getItems();
 
         // Create Mapping from artist to track
         Map<String, Map<String, List<TracksDto>>> grouping = new HashMap<>();
@@ -54,30 +43,31 @@ public class UniverseService {
         }
 
         // For each item in the list of track items
-        for(TracksDto item : items)
+        for(TracksDto track : topTracks)
         {
             // Get first artist from credits list
-            ArtistDto artistDto = item.getArtists().get(0);
+            ArtistDto artistDto = track.getArtists().get(0);
 
             // Get that artists Id
             String artistId = artistDto.getId();
 
             // Album object and info
-            AlbumDto albumDto = item.getAlbum();
+            AlbumDto albumDto = track.getAlbum();
 
             // Get albumID
             String albumId = albumDto.getId();
 
             // If artist exists map track to said album
             // Else create album map and then assign track to its list
-            grouping.computeIfAbsent(artistId, k -> new HashMap<>()).computeIfAbsent(albumId, k -> new ArrayList<>()).add(item);
+            grouping.computeIfAbsent(artistId, k -> new HashMap<>())
+            .computeIfAbsent(albumId, k -> new ArrayList<>()).add(track);
         }
 
         return grouping;
     }
 
     public UniverseResponseDto buildUniverse(
-        Map<String, Map<String, List<TracksDto>>> grouping) {
+        Map<String, Map<String, List<TracksDto>>> grouping, Map<String, Integer> trackRank, Map<String, Integer> artistRank) {
 
     // Create outer set of mappings for artists
     Set<Map.Entry<String, Map<String, List<TracksDto>>>> mappings =
@@ -98,6 +88,9 @@ public class UniverseService {
         // Set artist ID
         universeArtistDto.setId(entry.getKey());
 
+        // Get artist rank
+        Integer artistRanking = artistRank.get(entry.getKey());
+
         // Fetch artist object
         ArtistDto  artistInfo = spotifyService.fetchArtistInfo(universeArtistDto.getId());
 
@@ -106,6 +99,9 @@ public class UniverseService {
                    
         // Get images for artist
         universeArtistDto.setImages(artistInfo.getImages());
+
+        // Assign artist rank
+        universeArtistDto.setTopArtistRank(artistRanking);
 
         // Get mappings for release IDs and track lists
         Map<String, List<TracksDto>> releases = entry.getValue();
@@ -151,6 +147,12 @@ public class UniverseService {
                 // Set ID
                 universeTrackDto.setId(track.getId());
 
+                // Get track rank
+                int trackRanking = trackRank.get(universeTrackDto.getId());
+
+                // Assign trackRank
+                universeTrackDto.setTopTrackRank(trackRanking);
+
                 // Set name
                 universeTrackDto.setName(track.getName());
 
@@ -183,8 +185,42 @@ public class UniverseService {
 }
 
 public UniverseResponseDto fetchUniverse()
-    {
-    return buildUniverse(groupUniverse());
-    }
+{
+        // Fetch track dto
+        TopTracksResponseDto topTracksDto = spotifyService.fetchTopTracks();
+
+        // Fetch track items
+        List<TracksDto> topTracks = topTracksDto.getItems();
+
+        // Track rank map
+        Map<String, Integer> trackRank = new HashMap<>();
+
+        // Track rank count
+        int trackRanking = 1;
+
+        // Assign track rank
+        for (TracksDto tracksDto : topTracks) {
+            trackRank.put(tracksDto.getId(), trackRanking++);
+        }
+
+        // Fetch top artists
+        TopArtistsResponseDto topArtistsDto = spotifyService.fetchArtists();
+
+        // Fetch artist items
+        List<ArtistDto> topArtists = topArtistsDto.getItems();
+
+        // Artist rank map
+        Map<String, Integer> artistRank = new HashMap<>();
+
+        // Artist rank count
+        Integer artistRanking = 1;
+
+        // Assign artist rank
+        for (ArtistDto artistDto : topArtists) {
+            artistRank.put(artistDto.getId(), artistRanking++);
+        }
+
+    return buildUniverse(groupUniverse(topTracks, topArtists), trackRank, artistRank);
+}
 
 }

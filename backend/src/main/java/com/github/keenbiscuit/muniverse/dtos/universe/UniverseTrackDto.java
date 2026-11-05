@@ -20,6 +20,9 @@ public class UniverseTrackDto {
     //Track Name
     private String name;
 
+    // Track Rank in Universe
+    private int topTrackRank;
+
     // List of artists that appear on this track
     private List<ArtistDto> artists = new ArrayList<>();
 }
