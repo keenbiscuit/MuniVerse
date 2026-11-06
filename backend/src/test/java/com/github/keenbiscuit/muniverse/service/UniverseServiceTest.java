@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 
 import com.github.keenbiscuit.muniverse.dtos.AlbumDto;
 import com.github.keenbiscuit.muniverse.dtos.ArtistDto;
-import com.github.keenbiscuit.muniverse.dtos.TopTracksResponseDto;
 import com.github.keenbiscuit.muniverse.dtos.TracksDto;
 
 class UniverseServiceTest {

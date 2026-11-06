@@ -1,31 +1,36 @@
 import { Canvas } from "@react-three/fiber";
 import { useState } from "react";
 
-// Define UniverseScene component given artist prop from App.jsx
+// Define UniverseScene using artist data and active-artist state from App.jsx
 function UniverseScene({ artists, activeArtist, setActiveArtist }) {
+  // Artist selected in the universe
   const [selectedArtist, setSelectedArtist] = useState(null);
+
+  // Release selected inside the active artist galaxy
   const [selectedRelease, setSelectedRelease] = useState(null);
 
-  // Which track we selected
+  // Track selected inside the release system
   const [selectedTrack, setSelectedTrack] = useState(null);
 
-  // Make the sphere clickable
+  // Select an artist without entering their galaxy
   function handleArtistClick(artist) {
     setSelectedArtist(artist);
-    setSelectedRelease(artist.releases);
+    setSelectedRelease(null);
+    setSelectedTrack(null);
   }
 
-  // Deselect artist on clear space click
-  function handeClearSelection() {
+  // Clear the current selection when clicking empty space
+  function handleClearSelection() {
     if (activeArtist) {
       setSelectedTrack(null);
     } else {
       setSelectedArtist(null);
       setSelectedRelease(null);
+      setSelectedTrack(null);
     }
   }
 
-  // Go back to universe from solarSystem
+  // Return to the universe and clear all selections
   function handleBackToUniverse() {
     setActiveArtist(null);
     setSelectedArtist(null);
@@ -33,150 +38,225 @@ function UniverseScene({ artists, activeArtist, setActiveArtist }) {
     setSelectedTrack(null);
   }
 
-  // Exploring artists songs
+  // Enter an artist galaxy and clear previous release and track selections
   function handleExploreArtistClick(artist) {
     setActiveArtist(artist);
+    setSelectedRelease(null);
+    setSelectedTrack(null);
   }
 
+  // Enter one release system and clear the previous track selection
+  function handleReleaseClick(release) {
+    setSelectedRelease(release);
+    setSelectedTrack(null);
+  }
+
+  // Select a song planet
   function handleTrackClick(track) {
     setSelectedTrack(track);
   }
 
-  // Gather tracks into a single array
-  function handleTrackGrouping(activeArtist) {
-    if (activeArtist === null) {
-      return [];
-    }
-    let trackList = [];
-    let count = 0;
-    for (let index = 0; index < activeArtist?.releases?.length; index++) {
-      activeArtist.releases[index].tracks.forEach((element) => {
-        trackList[count++] = element;
-      });
-    }
-    return trackList;
+  // Return to the active artist's release systems
+  function handleBackToArtist() {
+    setSelectedRelease(null);
+    setSelectedTrack(null);
   }
 
-  // Get Track release
-  let activeTracks = handleTrackGrouping(activeArtist);
+  // Show the active artist when exploring, otherwise the selected artist
+  const displayedArtist = activeArtist ?? selectedArtist;
 
-  let selectedTrackRelease = null;
-  let releaseType = "";
+  // Read releases and tracks for the current navigation level
+  const releases = activeArtist?.releases ?? [];
+  const tracks = selectedRelease?.tracks ?? [];
 
-  if (selectedTrack) {
-    for (let index = 0; index < activeArtist?.releases?.length; index++) {
-      activeArtist.releases[index].tracks.forEach((element) => {
-        if (element.id === selectedTrack.id) {
-          selectedTrackRelease = activeArtist.releases[index];
-          releaseType = activeArtist.releases[index].album_type;
-        }
-      });
-    }
-  }
-
-  // Get project type for label
+  // Build the selected release's display label
   let releaseLabel = "";
 
-  if (releaseType === "album") {
-    releaseLabel = "Album: " + selectedTrackRelease.name;
-  } else if (releaseType === "single") {
-    releaseLabel = "Single";
-  } else if (releaseType === "compilation") {
-    releaseLabel = "Compilation: " + selectedTrackRelease.name;
+  if (selectedRelease?.album_type === "album") {
+    releaseLabel = "Album: " + selectedRelease.name;
+  } else if (selectedRelease?.album_type === "single") {
+    releaseLabel = "Single: " + selectedRelease.name;
+  } else if (selectedRelease?.album_type === "compilation") {
+    releaseLabel = "Compilation: " + selectedRelease.name;
   }
 
-  let trackImageUrl = "";
-  if (selectedTrackRelease?.images) {
-    trackImageUrl = selectedTrackRelease.images[0].url;
-  }
+  // Read the first release image when one exists
+  const trackImageUrl = selectedRelease?.images?.[0]?.url;
+
+  // Define visual size limits separately from backend weights
+  const minRadius = 0.6;
+  const maxRadius = 1.4;
+
+  // Leave a gap between neighboring spheres at the maximum radius
+  const sphereSpacing = 2 * maxRadius + 0.5;
 
   return (
     <div className="universe-canvas">
+      {/* Artist, release, and selected-track details */}
       <section className="artist-details">
-        <h2>{selectedArtist ? selectedArtist.name : "Select an Artist"}</h2>
+        <h2>{displayedArtist ? displayedArtist.name : "Select an Artist"}</h2>
 
-        {selectedArtist && (
-          <>
-            <div className="artist-actions">
-              {selectedArtist.images?.[0]?.url && (
-                <img
-                  src={selectedArtist.images[0].url}
-                  alt={selectedArtist.name}
-                  width={100}
-                />
-              )}
+        {displayedArtist && (
+          <div className="artist-actions">
+            {/* Show artist artwork only when an image URL exists */}
+            {displayedArtist.images?.[0]?.url && (
+              <img
+                src={displayedArtist.images[0].url}
+                alt={displayedArtist.name}
+                width={100}
+              />
+            )}
 
-              {activeArtist === null && selectedArtist && (
-                <button
-                  type="button"
-                  onClick={() => handleExploreArtistClick(selectedArtist)}
-                >
-                  Explore Artist System
-                </button>
-              )}
-              {selectedTrack && (
-                <>
-                  <p>{selectedTrack.name}</p>
-                  <p>
-                    {selectedTrack.artists
-                      .map((artist) => artist.name)
-                      .join(", ")}
-                  </p>
-                  {releaseLabel && <p>{releaseLabel}</p>}
-                  <p>
-                    <img
-                      src={trackImageUrl}
-                      alt={selectedArtist.name}
-                      width={100}
-                    />
-                  </p>
-                </>
-              )}
-            </div>
-          </>
+            {/* Enter the artist galaxy from the universe */}
+            {!activeArtist && selectedArtist && (
+              <button
+                type="button"
+                onClick={() => handleExploreArtistClick(selectedArtist)}
+              >
+                Explore Artist Galaxy
+              </button>
+            )}
+
+            {/* Handle artists without matching returned top tracks */}
+            {activeArtist && !selectedRelease && releases.length === 0 && (
+              <p>No songs from this artist in your returned top tracks.</p>
+            )}
+
+            {/* Prompt the user to choose a release */}
+            {activeArtist && !selectedRelease && releases.length > 0 && (
+              <p>Select a release system.</p>
+            )}
+
+            {/* Show the selected release's label and artwork */}
+            {selectedRelease && (
+              <>
+                <p>{releaseLabel || selectedRelease.name}</p>
+
+                {trackImageUrl && (
+                  <img
+                    src={trackImageUrl}
+                    alt={selectedRelease.name}
+                    width={100}
+                  />
+                )}
+              </>
+            )}
+
+            {/* Show the selected track and all credited artists */}
+            {selectedTrack && (
+              <>
+                <p>{selectedTrack.name}</p>
+                <p>
+                  {selectedTrack.artists
+                    .map((artist) => artist.name)
+                    .join(", ")}
+                </p>
+              </>
+            )}
+          </div>
         )}
       </section>
 
       <div className="universe-canvas">
+        {/* Return from any artist view to the universe */}
         {activeArtist && (
-          <button type="button" onClick={() => handleBackToUniverse()}>
+          <button type="button" onClick={handleBackToUniverse}>
             Back to Universe
           </button>
         )}
-        <Canvas onPointerMissed={handeClearSelection}>
+
+        {/* Return from a release system to the artist galaxy */}
+        {activeArtist && selectedRelease && (
+          <button type="button" onClick={handleBackToArtist}>
+            Back to Artist Galaxy
+          </button>
+        )}
+
+        {/* Temporary camera framing for the current row layout */}
+        <Canvas
+          camera={{ position: [0, 0, 20], fov: 40 }}
+          onPointerMissed={handleClearSelection}
+        >
+          {/* Universe view: render one sphere per artist */}
           {!activeArtist &&
-            artists.map((artist, index) => (
-              <mesh
-                key={artist.id}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleArtistClick(artist);
-                }}
-                position={[(index - (artists.length - 1) / 2) * 2.5, 0, 0]}
-              >
-                <sphereGeometry />
-                <meshStandardMaterial
-                  color={selectedArtist?.id === artist.id ? "cyan" : "orange"}
-                />
-              </mesh>
-            ))}
+            artists.map((artist, index) => {
+              // Map artist weight to a bounded visual radius
+              const artistWeight = artist.artistWeight ?? 0;
+              const radius = minRadius + (maxRadius - minRadius) * artistWeight;
+
+              return (
+                <mesh
+                  key={artist.id}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleArtistClick(artist);
+                  }}
+                  position={[
+                    (index - (artists.length - 1) / 2) * sphereSpacing,
+                    0,
+                    0,
+                  ]}
+                >
+                  <sphereGeometry args={[radius, 32, 32]} />
+                  <meshStandardMaterial
+                    color={selectedArtist?.id === artist.id ? "cyan" : "orange"}
+                  />
+                </mesh>
+              );
+            })}
+
+          {/* Artist galaxy view: render one sphere per release */}
           {activeArtist &&
-            activeTracks.map((track, index) => (
+            !selectedRelease &&
+            releases.map((release, index) => (
               <mesh
-                key={track.id}
+                key={release.id}
                 onClick={(event) => {
                   event.stopPropagation();
-                  handleTrackClick(track);
+                  handleReleaseClick(release);
                 }}
-                position={[(index - (activeTracks.length - 1) / 2) * 2.5, 0, 0]}
+                position={[
+                  (index - (releases.length - 1) / 2) * sphereSpacing,
+                  0,
+                  0,
+                ]}
               >
-                <sphereGeometry />
-                <meshStandardMaterial
-                  color={selectedTrack?.id === track.id ? "Purple" : "Maroon"}
-                />
+                {/* Release systems use a fixed size for now */}
+                <sphereGeometry args={[0.8, 32, 32]} />
+                <meshStandardMaterial color="orange" />
               </mesh>
             ))}
 
+          {/* Release system view: render its returned top tracks */}
+          {activeArtist &&
+            selectedRelease &&
+            tracks.map((track, index) => {
+              // Map track weight independently to a bounded radius
+              const trackWeight = track.trackWeight ?? 0;
+              const radius = minRadius + (maxRadius - minRadius) * trackWeight;
+
+              return (
+                <mesh
+                  key={track.id}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleTrackClick(track);
+                  }}
+                  position={[
+                    (index - (tracks.length - 1) / 2) * sphereSpacing,
+                    0,
+                    0,
+                  ]}
+                >
+                  <sphereGeometry args={[radius, 32, 32]} />
+                  <meshStandardMaterial
+                    color={selectedTrack?.id === track.id ? "purple" : "maroon"}
+                  />
+                </mesh>
+              );
+            })}
+
+          {/* Scene lighting */}
           <ambientLight intensity={0.3} />
           <directionalLight position={[3, 3, 3]} />
         </Canvas>
@@ -185,5 +265,5 @@ function UniverseScene({ artists, activeArtist, setActiveArtist }) {
   );
 }
 
-// Export UniverseScence component
+// Export UniverseScene for use in App.jsx
 export default UniverseScene;
