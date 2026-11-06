@@ -11,9 +11,9 @@ import lombok.NoArgsConstructor;
 /**
  * ArtistReleaseDto
  */
-@Data 
-@NoArgsConstructor 
-@AllArgsConstructor 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class UniverseReleaseDto {
     // release Id
     private String id;

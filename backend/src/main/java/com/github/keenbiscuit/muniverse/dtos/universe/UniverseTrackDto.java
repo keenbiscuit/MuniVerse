@@ -9,19 +9,22 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Data 
-@NoArgsConstructor 
-@AllArgsConstructor 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class UniverseTrackDto {
-    
+
     // Track ID
     private String id;
 
-    //Track Name
+    // Track Name
     private String name;
 
     // Track Rank in Universe
     private int topTrackRank;
+
+    // Track weight for size rendering
+    private Double trackWeight;
 
     // List of artists that appear on this track
     private List<ArtistDto> artists = new ArrayList<>();

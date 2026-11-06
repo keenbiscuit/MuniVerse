@@ -11,16 +11,16 @@ import org.springframework.web.client.RestClient;
 
 @Configuration
 public class RestClientConfig {
-    
-    @Bean
-    public RestClient spotifyRestClient(RestClient.Builder builder, OAuth2AuthorizedClientManager authorizedClientManager)
-    {
-        OAuth2ClientHttpRequestInterceptor requestInterceptor =
-				new OAuth2ClientHttpRequestInterceptor(authorizedClientManager);
 
-        return builder
-              .baseUrl("https://api.spotify.com")
-              .requestInterceptor(requestInterceptor)
-              .build();
-    }
+  @Bean
+  public RestClient spotifyRestClient(RestClient.Builder builder,
+      OAuth2AuthorizedClientManager authorizedClientManager) {
+    OAuth2ClientHttpRequestInterceptor requestInterceptor = new OAuth2ClientHttpRequestInterceptor(
+        authorizedClientManager);
+
+    return builder
+        .baseUrl("https://api.spotify.com")
+        .requestInterceptor(requestInterceptor)
+        .build();
+  }
 }

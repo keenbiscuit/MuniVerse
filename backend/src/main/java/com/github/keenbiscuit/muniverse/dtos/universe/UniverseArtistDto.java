@@ -10,8 +10,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Data 
-@AllArgsConstructor 
+@Data
+@AllArgsConstructor
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class UniverseArtistDto {
@@ -24,6 +24,9 @@ public class UniverseArtistDto {
 
     // Artist Rank in Universe
     private Integer topArtistRank;
+
+    // Artist weight for size rendering
+    private Double artistWeight;
 
     // List of Artist Images
     private List<ImageDto> images = new ArrayList<>();

@@ -20,31 +20,29 @@ import com.github.keenbiscuit.muniverse.dtos.universe.UniverseReleaseDto;
 import com.github.keenbiscuit.muniverse.dtos.universe.UniverseResponseDto;
 import com.github.keenbiscuit.muniverse.dtos.universe.UniverseTrackDto;
 
-@Service 
+@Service
 public class UniverseService {
 
     private final SpotifyService spotifyService;
-    
-    public UniverseService(SpotifyService spotifyService)
-    {
+
+    public UniverseService(SpotifyService spotifyService) {
         this.spotifyService = spotifyService;
     }
 
     // Method to organize universe ownership
-    public Map<String, Map<String, List<TracksDto>>> groupUniverse(List<TracksDto> topTracks, List<ArtistDto> topArtists)
-    {
+    public Map<String, Map<String, List<TracksDto>>> groupUniverse(List<TracksDto> topTracks,
+            List<ArtistDto> topArtists) {
 
         // Create Mapping from artist to track
         Map<String, Map<String, List<TracksDto>>> grouping = new HashMap<>();
 
         // Add each artists Id to grouping initialized with an empty map
         for (ArtistDto artist : topArtists) {
-            grouping.putIfAbsent(artist.getId(), new HashMap<String,List<TracksDto>>());
+            grouping.putIfAbsent(artist.getId(), new HashMap<String, List<TracksDto>>());
         }
 
         // For each item in the list of track items
-        for(TracksDto track : topTracks)
-        {
+        for (TracksDto track : topTracks) {
             // Get first artist from credits list
             ArtistDto artistDto = track.getArtists().get(0);
 
@@ -60,132 +58,144 @@ public class UniverseService {
             // If artist exists map track to said album
             // Else create album map and then assign track to its list
             grouping.computeIfAbsent(artistId, k -> new HashMap<>())
-            .computeIfAbsent(albumId, k -> new ArrayList<>()).add(track);
+                    .computeIfAbsent(albumId, k -> new ArrayList<>()).add(track);
         }
 
         return grouping;
     }
 
+    // Builds our desired universal relationship using the grouping map and artist
+    // ranks
     public UniverseResponseDto buildUniverse(
-        Map<String, Map<String, List<TracksDto>>> grouping, Map<String, Integer> trackRank, Map<String, Integer> artistRank) {
+            Map<String, Map<String, List<TracksDto>>> grouping, Map<String, Integer> trackRank,
+            Map<String, Integer> artistRank) {
 
-    // Create outer set of mappings for artists
-    Set<Map.Entry<String, Map<String, List<TracksDto>>>> mappings =
-            grouping.entrySet();
+        // Create outer set of mappings for artists
+        Set<Map.Entry<String, Map<String, List<TracksDto>>>> mappings = grouping.entrySet();
 
-    // Create universe DTO
-    UniverseResponseDto universeResponseDto = new UniverseResponseDto();
+        // Create universe DTO
+        UniverseResponseDto universeResponseDto = new UniverseResponseDto();
 
-    // Create list of artists
-    List<UniverseArtistDto> artists = new ArrayList<>();
+        // Create list of artists
+        List<UniverseArtistDto> artists = new ArrayList<>();
 
-    // For each artist map entry
-    for (Map.Entry<String, Map<String, List<TracksDto>>> entry : mappings) {
+        // For each artist map entry
+        for (Map.Entry<String, Map<String, List<TracksDto>>> entry : mappings) {
 
-        // Create artist DTO
-        UniverseArtistDto universeArtistDto = new UniverseArtistDto();
+            // Create artist DTO
+            UniverseArtistDto universeArtistDto = new UniverseArtistDto();
 
-        // Set artist ID
-        universeArtistDto.setId(entry.getKey());
+            // Set artist ID
+            universeArtistDto.setId(entry.getKey());
 
-        // Get artist rank
-        Integer artistRanking = artistRank.get(entry.getKey());
+            // Get artist rank
+            Integer artistRanking = artistRank.get(entry.getKey());
 
-        // Fetch artist object
-        ArtistDto  artistInfo = spotifyService.fetchArtistInfo(universeArtistDto.getId());
+            // Fetch artist object
+            ArtistDto artistInfo = spotifyService.fetchArtistInfo(universeArtistDto.getId());
 
-        // Set artist name
-        universeArtistDto.setName(artistInfo.getName());
-                   
-        // Get images for artist
-        universeArtistDto.setImages(artistInfo.getImages());
+            // Set artist name
+            universeArtistDto.setName(artistInfo.getName());
 
-        // Assign artist rank
-        universeArtistDto.setTopArtistRank(artistRanking);
+            // Get images for artist
+            universeArtistDto.setImages(artistInfo.getImages());
 
-        // Get mappings for release IDs and track lists
-        Map<String, List<TracksDto>> releases = entry.getValue();
+            // Assign artist rank
+            universeArtistDto.setTopArtistRank(artistRanking);
 
-        // Create release output list
-        List<UniverseReleaseDto> universeReleases = new ArrayList<>();
-
-        // For each release belonging to this artist
-        for (Map.Entry<String, List<TracksDto>> releaseEntry
-                : releases.entrySet()) {
-
-            // Read in track data
-            List<TracksDto> tracks = releaseEntry.getValue();
-
-            // Grouping creates nonempty lists; skip an empty one if supplied
-            if (tracks.isEmpty()) {
-                continue;
+            // Calculate artists weight if their rank exists
+            if (artistRanking != null) {
+                Double artistWeight = 1.0 / Math.sqrt(artistRanking);
+                universeArtistDto.setArtistWeight(artistWeight);
             }
 
-            // Read shared metadata from the first track in this release
-            TracksDto firstTrack = tracks.get(0);
-            AlbumDto album = firstTrack.getAlbum();
+            // Get mappings for release IDs and track lists
+            Map<String, List<TracksDto>> releases = entry.getValue();
 
-            // Create release DTO
-            UniverseReleaseDto universeReleaseDto = new UniverseReleaseDto();
+            // Create release output list
+            List<UniverseReleaseDto> universeReleases = new ArrayList<>();
 
-            // Set release ID and metadata
-            universeReleaseDto.setId(releaseEntry.getKey());
-            universeReleaseDto.setName(album.getName());
-            universeReleaseDto.setAlbum_type(album.getAlbum_type());
-            universeReleaseDto.setRelease_date(album.getRelease_date());
-            universeReleaseDto.setImages(album.getImages());
+            // For each release belonging to this artist
+            for (Map.Entry<String, List<TracksDto>> releaseEntry : releases.entrySet()) {
 
-            // Create track output list
-            List<UniverseTrackDto> universeTracks = new ArrayList<>();
+                // Read in track data
+                List<TracksDto> tracks = releaseEntry.getValue();
 
-            // For each track
-            for (TracksDto track : tracks) {
+                // Grouping creates nonempty lists; skip an empty one if supplied
+                if (tracks.isEmpty()) {
+                    continue;
+                }
 
-                // Create track DTO
-                UniverseTrackDto universeTrackDto = new UniverseTrackDto();
+                // Read shared metadata from the first track in this release
+                TracksDto firstTrack = tracks.get(0);
+                AlbumDto album = firstTrack.getAlbum();
 
-                // Set ID
-                universeTrackDto.setId(track.getId());
+                // Create release DTO
+                UniverseReleaseDto universeReleaseDto = new UniverseReleaseDto();
 
-                // Get track rank
-                int trackRanking = trackRank.get(universeTrackDto.getId());
+                // Set release ID and metadata
+                universeReleaseDto.setId(releaseEntry.getKey());
+                universeReleaseDto.setName(album.getName());
+                universeReleaseDto.setAlbum_type(album.getAlbum_type());
+                universeReleaseDto.setRelease_date(album.getRelease_date());
+                universeReleaseDto.setImages(album.getImages());
 
-                // Assign trackRank
-                universeTrackDto.setTopTrackRank(trackRanking);
+                // Create track output list
+                List<UniverseTrackDto> universeTracks = new ArrayList<>();
 
-                // Set name
-                universeTrackDto.setName(track.getName());
+                // For each track
+                for (TracksDto track : tracks) {
 
-                // Preserve all credited artists on the track
-                universeTrackDto.setArtists(track.getArtists());
+                    // Create track DTO
+                    UniverseTrackDto universeTrackDto = new UniverseTrackDto();
 
-                // Add track to the release's output list
-                universeTracks.add(universeTrackDto);
+                    // Set ID
+                    universeTrackDto.setId(track.getId());
+
+                    // Get track rank
+                    int trackRanking = trackRank.get(universeTrackDto.getId());
+
+                    // Calculate track weight
+                    Double trackWeight = 1.0 / Math.sqrt(trackRanking);
+
+                    // Assign trackRank
+                    universeTrackDto.setTopTrackRank(trackRanking);
+
+                    // Set name
+                    universeTrackDto.setName(track.getName());
+
+                    // Preserve all credited artists on the track
+                    universeTrackDto.setArtists(track.getArtists());
+
+                    // Assign track weight
+                    universeTrackDto.setTrackWeight(trackWeight);
+
+                    // Add track to the release's output list
+                    universeTracks.add(universeTrackDto);
+                }
+
+                // Attach tracks to the release
+                universeReleaseDto.setTracks(universeTracks);
+
+                // Add completed release to the artist's output list
+                universeReleases.add(universeReleaseDto);
             }
 
-            // Attach tracks to the release
-            universeReleaseDto.setTracks(universeTracks);
+            // Attach releases to the artist
+            universeArtistDto.setReleases(universeReleases);
 
-            // Add completed release to the artist's output list
-            universeReleases.add(universeReleaseDto);
+            // Add completed artist to the universe's output list
+            artists.add(universeArtistDto);
         }
 
-        // Attach releases to the artist
-        universeArtistDto.setReleases(universeReleases);
+        // Attach artists to the universe
+        universeResponseDto.setArtists(artists);
 
-        // Add completed artist to the universe's output list
-        artists.add(universeArtistDto);
+        // Return completed universe response
+        return universeResponseDto;
     }
 
-    // Attach artists to the universe
-    universeResponseDto.setArtists(artists);
-
-    // Return completed universe response
-    return universeResponseDto;
-}
-
-public UniverseResponseDto fetchUniverse()
-{
+    public UniverseResponseDto fetchUniverse() {
         // Fetch track dto
         TopTracksResponseDto topTracksDto = spotifyService.fetchTopTracks();
 
@@ -220,7 +230,7 @@ public UniverseResponseDto fetchUniverse()
             artistRank.put(artistDto.getId(), artistRanking++);
         }
 
-    return buildUniverse(groupUniverse(topTracks, topArtists), trackRank, artistRank);
-}
+        return buildUniverse(groupUniverse(topTracks, topArtists), trackRank, artistRank);
+    }
 
 }

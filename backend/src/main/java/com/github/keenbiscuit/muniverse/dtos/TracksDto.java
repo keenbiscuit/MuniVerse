@@ -7,15 +7,15 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Data 
-@NoArgsConstructor 
-@AllArgsConstructor 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class TracksDto {
-    
+
     // Track ID
     private String id;
 
-    //Track Name
+    // Track Name
     private String name;
 
     // Album object and info

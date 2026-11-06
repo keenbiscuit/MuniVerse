@@ -8,11 +8,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@NoArgsConstructor 
+@NoArgsConstructor
 @AllArgsConstructor
 public class UniverseResponseDto {
-    
-    
+
     // List of artists
     private List<UniverseArtistDto> artists = new ArrayList<>();
 }

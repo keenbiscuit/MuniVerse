@@ -39,7 +39,7 @@ class UniverseServiceTest {
 
         TracksDto second = new TracksDto();
         second.setArtists(List.of(dominic));
-        second.setName("Double Negative"); 
+        second.setName("Double Negative");
         second.setAlbum(whatCould);
 
         TracksDto third = new TracksDto();
@@ -52,24 +52,35 @@ class UniverseServiceTest {
         fourth.setName("LILY WAS A CAVALIER");
         fourth.setAlbum(howToQuit);
 
-        
+        Map<String, Map<String, List<TracksDto>>> result = universeService.groupUniverse(
+                List.of(first, second, third, fourth),
+                List.of());
 
-        TopTracksResponseDto response = new TopTracksResponseDto();
-        response.setItems(List.of(first, second, third, fourth));
-
-
-
-        when(spotifyService.fetchTopTracks()).thenReturn(response);
-
-        Map<String, Map<String, List<TracksDto>>> result = universeService.groupUniverse();
- 
         assertEquals(2, result.size());
 
         assertEquals(2, result.get("dominic").size());
         assertEquals(List.of(first, fourth), result.get("dominic").get("HOW TO QUIT SMOKING"));
         assertEquals(List.of(second), result.get("dominic").get("What Could Possibly Go Wrong"));
-        
+
         assertEquals(1, result.get("grace").size());
         assertEquals(List.of(third), result.get("grace").get("HOW TO QUIT SMOKING"));
+    }
+
+    @Test
+    void includesTopArtistWithoutMatchingTracks() {
+        SpotifyService spotifyService = mock(SpotifyService.class);
+        UniverseService universeService = new UniverseService(spotifyService);
+
+        ArtistDto artist = new ArtistDto();
+        artist.setId("top-artist");
+
+        Map<String, Map<String, List<TracksDto>>> result = universeService.groupUniverse(
+                List.of(),
+                List.of(artist));
+
+        assertEquals(1, result.size());
+        assertEquals(Map.of(), result.get("top-artist"));
+
+        verifyNoInteractions(spotifyService);
     }
 }
