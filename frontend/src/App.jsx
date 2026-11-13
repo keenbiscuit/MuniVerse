@@ -6,6 +6,7 @@ function App() {
   const [artists, setArtists] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   // Keep data-loading settings in App.
   const [timeRange, setTimeRange] = useState("short_term");
@@ -19,6 +20,7 @@ function App() {
     setActiveArtist(null);
     setArtists([]);
     setError(null);
+    setHasLoaded(false);
   }
 
   // Load the universe for the currently selected range.
@@ -30,15 +32,20 @@ function App() {
       const response = await fetch(`/spotify/universe?timeRange=${timeRange}`);
 
       if (!response.ok) {
-        throw new Error("Network response was not ok");
+        throw new Error(`Universe request failed: ${response.status}`);
       }
 
       const data = await response.json();
 
+      if (!Array.isArray(data.artists)) {
+        throw new Error("Universe response did not contain an artists array");
+      }
+
       setArtists(data.artists);
+      setHasLoaded(true);
     } catch (error) {
       console.error("Fetch Error:", error);
-      setError("Could not load artists. Please try again.");
+      setError("Could not load your universe. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -53,6 +60,7 @@ function App() {
         setActiveArtist={setActiveArtist}
         timeRange={timeRange}
         isLoading={isLoading}
+        hasLoaded={hasLoaded}
         error={error}
         onTimeRangeChange={handleTimeRangeChange}
         onLoadUniverse={handleLoadUniverse}

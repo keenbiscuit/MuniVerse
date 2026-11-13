@@ -7,6 +7,8 @@ export default function UniverseInfoPanel({
   entryRequest,
   timeRange,
   isLoading,
+  hasLoaded,
+  artistCount,
   error,
   onTimeRangeChange,
   onLoadUniverse,
@@ -53,6 +55,9 @@ export default function UniverseInfoPanel({
       : "";
 
   const releaseType = selectedRelease?.album_type?.replaceAll("_", " ");
+  const trackSpotifyUrl = selectedTrack?.id
+    ? `https://open.spotify.com/track/${encodeURIComponent(selectedTrack.id)}`
+    : null;
 
   return (
     <aside className="universe-info-panel" aria-label="Universe information">
@@ -70,6 +75,12 @@ export default function UniverseInfoPanel({
         className="universe-info-settings"
         aria-label="Universe settings"
       >
+        <a
+          className="universe-info-spotify-link"
+          href="http://127.0.0.1:8080/oauth2/authorization/spotify"
+        >
+          Connect Spotify
+        </a>
         <label htmlFor="time-range">Time range</label>
 
         <select
@@ -115,18 +126,29 @@ export default function UniverseInfoPanel({
       <div className="universe-info-content">
         {!activeArtist && (
           <>
-            <p>
-              Starting near <span>{startingArtist?.name ?? "your music"}</span>.
-            </p>
+            {artistCount > 0 ? (
+              <>
+                <p>
+                  Starting near{" "}
+                  <span>{startingArtist?.name ?? "your music"}</span>.
+                </p>
 
-            {selectedArtist && !entryRequest && (
-              <p>Selected artist: {selectedArtist.name}</p>
-            )}
+                {selectedArtist && !entryRequest && (
+                  <p>Selected artist: {selectedArtist.name}</p>
+                )}
 
-            <p>
-              Travel between galaxies, then click one to explore its release
-              systems.
-            </p>
+                <p>
+                  Travel between galaxies, then click one to explore its release
+                  systems.
+                </p>
+              </>
+            ) : !isLoading && !error ? (
+              <p role="status">
+                {hasLoaded
+                  ? "No explorable artist systems were returned for this time range. Choose another range and load your universe again."
+                  : "Choose a time range, then select Load Universe to begin."}
+              </p>
+            ) : null}
           </>
         )}
 
@@ -186,9 +208,20 @@ export default function UniverseInfoPanel({
             </dl>
 
             <p>
-              Each planet represents a song in the returned listening-profile
-              data.
+              Planet size reflects this song's relative rank-derived weight for
+              the selected time range, not listening minutes.
             </p>
+
+            {trackSpotifyUrl && (
+              <a
+                className="universe-info-spotify-link"
+                href={trackSpotifyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open in Spotify
+              </a>
+            )}
           </>
         )}
       </div>

@@ -233,6 +233,7 @@ function UniverseScene({
   setActiveArtist,
   timeRange,
   isLoading,
+  hasLoaded,
   error,
   onTimeRangeChange,
   onLoadUniverse,
@@ -504,6 +505,8 @@ function UniverseScene({
         entryRequest={entryRequest}
         timeRange={timeRange}
         isLoading={isLoading}
+        hasLoaded={hasLoaded}
+        artistCount={artists.length}
         error={error}
         onTimeRangeChange={onTimeRangeChange}
         onLoadUniverse={onLoadUniverse}

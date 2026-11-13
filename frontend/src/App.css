@@ -408,3 +408,27 @@
 .universe-info-note p + p {
   margin-top: 8px;
 }
+
+.universe-info-spotify-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid rgba(183, 132, 255, 0.5);
+  border-radius: 0.6rem;
+  background: rgba(183, 132, 255, 0.1);
+  color: #f4edff;
+  font: inherit;
+  text-decoration: none;
+}
+
+.universe-info-spotify-link:hover {
+  border-color: #b784ff;
+  background: rgba(183, 132, 255, 0.2);
+}
+
+.universe-info-spotify-link:focus-visible {
+  outline: 2px solid #d8bdff;
+  outline-offset: 3px;
+}
