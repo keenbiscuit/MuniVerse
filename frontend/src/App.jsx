@@ -1,36 +1,43 @@
 import "./App.css";
-import UniverseScene from "./UniverseScene";
 import { useState } from "react";
+import UniverseScene from "./UniverseScene";
 
 function App() {
   const [artists, setArtists] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  // remove loading button when artists are selected? would need back to start button to load again or browser refresh
-  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(null);
 
-  // Artist who's system we've entered
+  // Keep data-loading settings in App.
+  const [timeRange, setTimeRange] = useState("short_term");
+
+  // Artist whose galaxy is currently open.
   const [activeArtist, setActiveArtist] = useState(null);
 
-  // Load universe
-  async function hanldeLoadUniverse() {
-    setIsLoading(true);
+  // Changing the range clears the previous universe.
+  function handleTimeRangeChange(nextTimeRange) {
+    setTimeRange(nextTimeRange);
+    setActiveArtist(null);
+    setArtists([]);
+    setError(null);
+  }
 
+  // Load the universe for the currently selected range.
+  async function handleLoadUniverse() {
+    setIsLoading(true);
     setError(null);
 
     try {
-      const response = await fetch("/spotify/universe");
+      const response = await fetch(`/spotify/universe?timeRange=${timeRange}`);
 
-      // Check if response was okay
       if (!response.ok) {
         throw new Error("Network response was not ok");
       }
 
       const data = await response.json();
-      console.log(data);
-      setArtists(data["artists"]);
+
+      setArtists(data.artists);
     } catch (error) {
-      console.error("Fetch Error: ", error);
+      console.error("Fetch Error:", error);
       setError("Could not load artists. Please try again.");
     } finally {
       setIsLoading(false);
@@ -38,25 +45,19 @@ function App() {
   }
 
   return (
-    <>
-      <main>
-        <h1> Your Spotify Universe </h1>
-        <p> Your Top Spotify Artist By Affinity</p>
-        {activeArtist === null && (
-          <button disabled={isLoading} onClick={hanldeLoadUniverse}>
-            {isLoading ? "Loading Artists" : "Load Artists"}
-          </button>
-        )}
-        {error && <p>{error}</p>}
-        <UniverseScene
-          activeArtist={activeArtist}
-          setActiveArtist={setActiveArtist}
-          artists={artists}
-        >
-          {" "}
-        </UniverseScene>
-      </main>
-    </>
+    <main>
+      <UniverseScene
+        key={timeRange}
+        artists={artists}
+        activeArtist={activeArtist}
+        setActiveArtist={setActiveArtist}
+        timeRange={timeRange}
+        isLoading={isLoading}
+        error={error}
+        onTimeRangeChange={handleTimeRangeChange}
+        onLoadUniverse={handleLoadUniverse}
+      />
+    </main>
   );
 }
 

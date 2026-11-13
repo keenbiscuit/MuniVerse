@@ -3,6 +3,7 @@ package com.github.keenbiscuit.muniverse.controller;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.github.keenbiscuit.muniverse.dtos.TopArtistsResponseDto;
@@ -25,23 +26,26 @@ public class SpotifyController {
     // Get a user's top artists
     @GetMapping("/spotify/top-artists")
     public TopArtistsResponseDto getTopArtists(
-            @RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient authorizedClient) {
+            @RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient authorizedClient,
+            @RequestParam(name = "timeRange", defaultValue = "short_term") String timeRange) {
 
-        return spotifyService.fetchArtists();
+        return spotifyService.fetchArtists(timeRange);
     }
 
     // Get a user's top tracks
     @GetMapping("/spotify/top-tracks")
     public TopTracksResponseDto getTopTracks(
-            @RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient authorizedClient) {
+            @RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient authorizedClient,
+            @RequestParam(name = "timeRange", defaultValue = "short_term") String timeRange) {
 
-        return spotifyService.fetchTopTracks();
+        return spotifyService.fetchTopTracks(timeRange);
     }
 
     // Get a user's Musical Universe
     @GetMapping("/spotify/universe")
     public UniverseResponseDto getUniverse(
-            @RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient authorizedClient) {
-        return universeService.fetchUniverse();
+            @RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient authorizedClient,
+            @RequestParam(name = "timeRange", defaultValue = "short_term") String timeRange) {
+        return universeService.fetchUniverse(timeRange);
     }
 }

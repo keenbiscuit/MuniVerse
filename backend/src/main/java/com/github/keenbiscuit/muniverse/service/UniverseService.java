@@ -181,6 +181,11 @@ public class UniverseService {
                 universeReleases.add(universeReleaseDto);
             }
 
+            // Skip artists without any returned release systems to explore
+            if (universeReleases.isEmpty()) {
+                continue;
+            }
+
             // Attach releases to the artist
             universeArtistDto.setReleases(universeReleases);
 
@@ -195,9 +200,9 @@ public class UniverseService {
         return universeResponseDto;
     }
 
-    public UniverseResponseDto fetchUniverse() {
+    public UniverseResponseDto fetchUniverse(String timeRange) {
         // Fetch track dto
-        TopTracksResponseDto topTracksDto = spotifyService.fetchTopTracks();
+        TopTracksResponseDto topTracksDto = spotifyService.fetchTopTracks(timeRange);
 
         // Fetch track items
         List<TracksDto> topTracks = topTracksDto.getItems();
@@ -214,7 +219,7 @@ public class UniverseService {
         }
 
         // Fetch top artists
-        TopArtistsResponseDto topArtistsDto = spotifyService.fetchArtists();
+        TopArtistsResponseDto topArtistsDto = spotifyService.fetchArtists(timeRange);
 
         // Fetch artist items
         List<ArtistDto> topArtists = topArtistsDto.getItems();
