@@ -228,6 +228,8 @@ function ReleaseSystem({
 
 // Coordinate universe layout, selection, navigation, and camera modes.
 function UniverseScene({
+  authStatus,
+  authError,
   artists,
   activeArtist,
   setActiveArtist,
@@ -497,6 +499,8 @@ function UniverseScene({
     <div className="universe-scene">
       {/* One context-aware panel owns details, navigation, and travel help. */}
       <UniverseInfoPanel
+        authStatus={authStatus}
+        authError={authError}
         startingArtist={startingArtist}
         selectedArtist={selectedArtist}
         activeArtist={activeArtist}

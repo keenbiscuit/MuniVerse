@@ -1,4 +1,6 @@
 export default function UniverseInfoPanel({
+  authStatus,
+  authError,
   startingArtist,
   selectedArtist,
   activeArtist,
@@ -75,12 +77,34 @@ export default function UniverseInfoPanel({
         className="universe-info-settings"
         aria-label="Universe settings"
       >
-        <a
-          className="universe-info-spotify-link"
-          href="http://127.0.0.1:8080/oauth2/authorization/spotify"
-        >
-          Connect Spotify
-        </a>
+        <div className="universe-info-connection">
+          {authStatus === "checking" && (
+            <p className="universe-info-status" role="status">
+              Checking Spotify connection…
+            </p>
+          )}
+
+          {authStatus === "connected" && (
+            <p className="universe-info-status" role="status">
+              Spotify connected
+            </p>
+          )}
+
+          {(authStatus === "disconnected" || authStatus === "error") && (
+            <a
+              className="universe-info-spotify-link"
+              href="http://127.0.0.1:8080/oauth2/authorization/spotify"
+            >
+              Connect Spotify
+            </a>
+          )}
+
+          {authError && (
+            <p className="universe-info-error" role="alert">
+              {authError}
+            </p>
+          )}
+        </div>
         <label htmlFor="time-range">Time range</label>
 
         <select
@@ -99,7 +123,9 @@ export default function UniverseInfoPanel({
         {!activeArtist && (
           <button
             type="button"
-            disabled={isLoading || Boolean(entryRequest)}
+            disabled={
+              isLoading || Boolean(entryRequest) || authStatus !== "connected"
+            }
             onClick={onLoadUniverse}
           >
             {isLoading ? "Loading Universe…" : "Load Universe"}
@@ -146,7 +172,13 @@ export default function UniverseInfoPanel({
               <p role="status">
                 {hasLoaded
                   ? "No explorable artist systems were returned for this time range. Choose another range and load your universe again."
-                  : "Choose a time range, then select Load Universe to begin."}
+                  : authStatus === "checking"
+                    ? "Checking whether Spotify is connected."
+                    : authStatus === "connected"
+                      ? "Choose a time range, then select Load Universe to begin."
+                      : authStatus === "disconnected"
+                        ? "Connect Spotify to begin exploring your music."
+                        : "Spotify connection status is unavailable."}
               </p>
             ) : null}
           </>
@@ -266,7 +298,7 @@ export default function UniverseInfoPanel({
       )}
 
       <footer className="universe-info-note">
-        <p>Sizes use relative rank-derived weights minutes.</p>
+        <p>Sizes use rank-derived weights, not listening minutes</p>
         <p>
           Each time range shows a separate Spotify ranking. Songs and artists
           may differ between ranges.

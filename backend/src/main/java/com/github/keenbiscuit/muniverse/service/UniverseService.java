@@ -68,7 +68,7 @@ public class UniverseService {
     // ranks
     public UniverseResponseDto buildUniverse(
             Map<String, Map<String, List<TracksDto>>> grouping, Map<String, Integer> trackRank,
-            Map<String, Integer> artistRank) {
+            Map<String, Integer> artistRank, Map<String, ArtistDto> artistInfoById) {
 
         // Create outer set of mappings for artists
         Set<Map.Entry<String, Map<String, List<TracksDto>>>> mappings = grouping.entrySet();
@@ -81,6 +81,11 @@ public class UniverseService {
 
         // For each artist map entry
         for (Map.Entry<String, Map<String, List<TracksDto>>> entry : mappings) {
+            // Do not fetch metadata for artists with no tracks to explore.
+            if (entry.getValue().values().stream()
+                    .allMatch(List::isEmpty)) {
+                continue;
+            }
 
             // Create artist DTO
             UniverseArtistDto universeArtistDto = new UniverseArtistDto();
@@ -92,7 +97,12 @@ public class UniverseService {
             Integer artistRanking = artistRank.get(entry.getKey());
 
             // Fetch artist object
-            ArtistDto artistInfo = spotifyService.fetchArtistInfo(universeArtistDto.getId());
+            ArtistDto artistInfo = artistInfoById.get(universeArtistDto.getId());
+
+            if (artistInfo == null) {
+                artistInfo = spotifyService.fetchArtistInfo(
+                        universeArtistDto.getId());
+            }
 
             // Set artist name
             universeArtistDto.setName(artistInfo.getName());
@@ -224,6 +234,12 @@ public class UniverseService {
         // Fetch artist items
         List<ArtistDto> topArtists = topArtistsDto.getItems();
 
+        Map<String, ArtistDto> artistInfoById = new HashMap<>();
+
+        for (ArtistDto artistDto : topArtists) {
+            artistInfoById.put(artistDto.getId(), artistDto);
+        }
+
         // Artist rank map
         Map<String, Integer> artistRank = new HashMap<>();
 
@@ -235,7 +251,7 @@ public class UniverseService {
             artistRank.put(artistDto.getId(), artistRanking++);
         }
 
-        return buildUniverse(groupUniverse(topTracks, topArtists), trackRank, artistRank);
+        return buildUniverse(groupUniverse(topTracks, topArtists), trackRank, artistRank, artistInfoById);
     }
 
 }

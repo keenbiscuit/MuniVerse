@@ -1,10 +1,17 @@
 package com.github.keenbiscuit.muniverse.controller;
 
+import java.util.Map;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.HttpClientErrorException;
 
 import com.github.keenbiscuit.muniverse.dtos.TopArtistsResponseDto;
 import com.github.keenbiscuit.muniverse.dtos.TopTracksResponseDto;
@@ -47,5 +54,32 @@ public class SpotifyController {
             @RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient authorizedClient,
             @RequestParam(name = "timeRange", defaultValue = "short_term") String timeRange) {
         return universeService.fetchUniverse(timeRange);
+    }
+
+    @ExceptionHandler(HttpClientErrorException.TooManyRequests.class)
+    public ResponseEntity<Map<String, String>> handleSpotifyQuota(
+            HttpClientErrorException.TooManyRequests exception) {
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setCacheControl("no-store");
+
+        HttpHeaders spotifyHeaders = exception.getResponseHeaders();
+
+        if (spotifyHeaders != null) {
+            String retryAfter = spotifyHeaders.getFirst(HttpHeaders.RETRY_AFTER);
+
+            if (retryAfter != null) {
+                headers.set(HttpHeaders.RETRY_AFTER, retryAfter);
+            }
+        }
+
+        return ResponseEntity
+                .status(HttpStatus.TOO_MANY_REQUESTS)
+                .headers(headers)
+                .body(Map.of(
+                        "code", "SPOTIFY_REQUEST_LIMIT",
+                        "message",
+                        "Spotify's API request limit or quota has been reached. "
+                                + "Please try again later."));
     }
 }

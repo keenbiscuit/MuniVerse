@@ -19,6 +19,7 @@ public class SpotifyService {
 
         public SpotifyService(@Qualifier("spotifyRestClient") RestClient spotifyRestClient) {
                 this.spotifyRestClient = spotifyRestClient;
+
         }
 
         public TopArtistsResponseDto fetchArtists(String timeRange) {

@@ -1,3 +1,6 @@
+app:
+  frontend-url: ${APP_FRONTEND_URL:http://127.0.0.1:5173/}
+
 spring:
   application:
     name: muniverse
@@ -23,6 +26,3 @@ spring:
             token-uri: https://accounts.spotify.com/api/token
             user-info-uri: https://api.spotify.com/v1/me
             user-name-attribute: id
-# logging:
-#   level:
-#     org.springframework.security: DEBUG
