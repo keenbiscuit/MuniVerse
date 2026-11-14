@@ -61,6 +61,10 @@ export default function UniverseInfoPanel({
     ? `https://open.spotify.com/track/${encodeURIComponent(selectedTrack.id)}`
     : null;
 
+  const spotifyLoginUrl = import.meta.env.DEV
+    ? "http://127.0.0.1:8080/oauth2/authorization/spotify"
+    : "/oauth2/authorization/spotify";
+
   return (
     <aside className="universe-info-panel" aria-label="Universe information">
       <header className="universe-info-header">
@@ -91,10 +95,7 @@ export default function UniverseInfoPanel({
           )}
 
           {(authStatus === "disconnected" || authStatus === "error") && (
-            <a
-              className="universe-info-spotify-link"
-              href="http://127.0.0.1:8080/oauth2/authorization/spotify"
-            >
+            <a className="universe-info-spotify-link" href={spotifyLoginUrl}>
               Connect Spotify
             </a>
           )}
