@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { Box3, MathUtils, Sphere, Vector3 } from "three";
@@ -13,8 +12,17 @@ export default function SelectionCameraControls({
 }) {
   const controlsRef = useRef(null);
   const followRef = useRef(null);
+  const framingRef = useRef(null);
+  const hasFramedRef = useRef(false);
 
   const { camera } = useThree();
+
+  // Preserve the incoming viewing direction when OrbitControls first mounts.
+  const initialTarget = useMemo(() => {
+    const direction = camera.getWorldDirection(new Vector3());
+
+    return camera.position.clone().add(direction).toArray();
+  }, [camera]);
 
   const scratch = useMemo(
     () => ({
@@ -22,68 +30,88 @@ export default function SelectionCameraControls({
       worldScale: new Vector3(),
       destination: new Vector3(),
       movement: new Vector3(),
+      direction: new Vector3(),
     }),
     [],
   );
 
-  // Frame all visible content at the current artist/release level.
+  // Calculate the framing destination and begin a smooth transition.
   const frameContent = useCallback(() => {
     const controls = controlsRef.current;
     const content = contentRef.current;
 
     if (!controls || !content) return;
 
-    controls.enabled = true;
-    controls.enablePan = true;
-    controls.minDistance = 0.1;
-    controls.maxDistance = Infinity;
-
     content.updateWorldMatrix(true, true);
 
     const bounds = new Box3().setFromObject(content);
 
+    let endTarget;
+    let endPosition;
+    let far = 2000;
+
     if (bounds.isEmpty()) {
-      controls.target.set(0, 0, 0);
+      endTarget = new Vector3(0, 0, 0);
+      endPosition = new Vector3(0, 0, 40);
+    } else {
+      const sphere = bounds.getBoundingSphere(new Sphere());
 
-      camera.position.set(0, 0, 40);
-      camera.near = 0.1;
-      camera.far = 2000;
-      camera.updateProjectionMatrix();
+      const verticalHalfFov = MathUtils.degToRad(camera.fov / 2);
 
-      controls.update();
-      return;
+      const horizontalHalfFov = Math.atan(
+        Math.tan(verticalHalfFov) * camera.aspect,
+      );
+
+      const limitingHalfFov = Math.min(verticalHalfFov, horizontalHalfFov);
+
+      const radius = Math.max(sphere.radius, 1);
+      const distance = (radius / Math.sin(limitingHalfFov)) * 1.2;
+
+      endTarget = sphere.center.clone();
+
+      endPosition = sphere.center.clone().add(new Vector3(0, 0, distance));
+
+      far = Math.max(2000, distance + radius * 10);
     }
 
-    const sphere = bounds.getBoundingSphere(new Sphere());
+    const startPosition = camera.position.clone();
+    const startTarget = controls.target.clone();
 
-    const verticalHalfFov = MathUtils.degToRad(camera.fov / 2);
+    // On entry, retain the incoming camera direction while giving the
+    // temporary target a useful distance for interpolation.
+    if (!hasFramedRef.current) {
+      camera.getWorldDirection(scratch.direction);
 
-    const horizontalHalfFov = Math.atan(
-      Math.tan(verticalHalfFov) * camera.aspect,
-    );
+      const targetDistance = Math.max(camera.position.distanceTo(endTarget), 1);
 
-    const limitingHalfFov = Math.min(verticalHalfFov, horizontalHalfFov);
+      startTarget
+        .copy(camera.position)
+        .addScaledVector(scratch.direction, targetDistance);
 
-    const radius = Math.max(sphere.radius, 1);
+      controls.target.copy(startTarget);
+      hasFramedRef.current = true;
+    }
 
-    const distance = (radius / Math.sin(limitingHalfFov)) * 1.2;
+    framingRef.current = {
+      elapsed: 0,
+      duration: 1.25,
+      startPosition,
+      startTarget,
+      endPosition,
+      endTarget,
+    };
 
-    controls.target.copy(sphere.center);
-
-    camera.position.set(
-      sphere.center.x,
-      sphere.center.y,
-      sphere.center.z + distance,
-    );
+    controls.enabled = false;
+    controls.enablePan = true;
+    controls.minDistance = 0.1;
+    controls.maxDistance = Infinity;
 
     camera.near = 0.1;
-    camera.far = Math.max(2000, distance + radius * 10);
+    camera.far = far;
     camera.updateProjectionMatrix();
+  }, [camera, contentRef, scratch]);
 
-    controls.update();
-  }, [camera, contentRef]);
-
-  // Navigation changes frame the destination, not the selected song.
+  // Navigation starts a framing transition, not an immediate reposition.
   useEffect(() => {
     followRef.current = null;
     frameContent();
@@ -97,19 +125,50 @@ export default function SelectionCameraControls({
 
     const shouldFollow = viewLevel === "release" && selectedTrackId != null;
 
-    // Clearing track selection exits follow mode.
     if (!shouldFollow) {
+      // Leaving planet inspection smoothly reframes the release.
       if (followRef.current) {
         followRef.current = null;
         frameContent();
       }
 
+      const framing = framingRef.current;
+
+      if (!framing) return;
+
+      framing.elapsed += Math.min(delta, 0.05);
+
+      const progress = Math.min(framing.elapsed / framing.duration, 1);
+
+      const eased = progress * progress * (3 - 2 * progress);
+
+      camera.position.lerpVectors(
+        framing.startPosition,
+        framing.endPosition,
+        eased,
+      );
+
+      controls.target.lerpVectors(
+        framing.startTarget,
+        framing.endTarget,
+        eased,
+      );
+
+      controls.update();
+
+      if (progress === 1) {
+        framingRef.current = null;
+        controls.enabled = true;
+      }
+
       return;
     }
 
+    // Planet selection takes priority over a framing transition.
+    framingRef.current = null;
+
     let follow = followRef.current;
 
-    // A different selected track starts a fresh approach.
     if (!follow || follow.trackId !== selectedTrackId) {
       const mesh = content.getObjectByName(`song-planet-${selectedTrackId}`);
 
@@ -139,7 +198,7 @@ export default function SelectionCameraControls({
 
       const approachDistance = (worldRadius / Math.sin(limitingHalfFov)) * 1.4;
 
-      // Preserve the current viewing direction during the approach.
+      // Preserve the current viewing direction during planet approach.
       const offset = camera.position.clone().sub(controls.target);
 
       if (offset.lengthSq() < 0.0001) {
@@ -178,7 +237,7 @@ export default function SelectionCameraControls({
 
       const eased = progress * progress * (3 - 2 * progress);
 
-      // The destination follows the planet during the approach.
+      // Continue approaching the planet as it moves along its orbit.
       scratch.destination.copy(scratch.worldPosition).add(follow.offset);
 
       camera.position.lerpVectors(
@@ -199,7 +258,6 @@ export default function SelectionCameraControls({
 
       if (progress === 1) {
         follow.approaching = false;
-
         controls.minDistance = follow.worldRadius * 1.4;
         controls.enabled = true;
       }
@@ -207,8 +265,7 @@ export default function SelectionCameraControls({
       return;
     }
 
-    // Translate the camera by the planet's movement since last frame.
-    // This preserves any orbit angle or zoom chosen by the user.
+    // Preserve the user's orbit angle and zoom while following the planet.
     scratch.movement.copy(scratch.worldPosition).sub(follow.previousPosition);
 
     camera.position.add(scratch.movement);
@@ -219,5 +276,12 @@ export default function SelectionCameraControls({
     controls.update();
   });
 
-  return <OrbitControls ref={controlsRef} makeDefault enableDamping={false} />;
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      target={initialTarget}
+      makeDefault
+      enableDamping={false}
+    />
+  );
 }
