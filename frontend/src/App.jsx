@@ -1,6 +1,7 @@
 import "./App.css";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import UniverseScene from "./UniverseScene";
+import { createSampleUniverse } from "./data/SampleUniverse";
 
 function App() {
   const [artists, setArtists] = useState([]);
@@ -9,12 +10,16 @@ function App() {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [authStatus, setAuthStatus] = useState("checking");
   const [authError, setAuthError] = useState(null);
+  const [universeSource, setUniverseSource] = useState("spotify");
+  const [sceneVersion, setSceneVersion] = useState(0);
 
   // Keep data-loading settings in App.
   const [timeRange, setTimeRange] = useState("short_term");
 
   // Artist whose galaxy is currently open.
   const [activeArtist, setActiveArtist] = useState(null);
+
+  const universeRequestRef = useRef(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -55,6 +60,41 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      universeRequestRef.current?.abort();
+    };
+  }, []);
+
+  function cancelUniverseRequest() {
+    universeRequestRef.current?.abort();
+    universeRequestRef.current = null;
+  }
+
+  function handleLoadSampleUniverse() {
+    cancelUniverseRequest();
+
+    setUniverseSource("sample");
+    setActiveArtist(null);
+    setArtists(createSampleUniverse());
+    setError(null);
+    setIsLoading(false);
+    setHasLoaded(true);
+    setSceneVersion((version) => version + 1);
+  }
+
+  function handleUseSpotify() {
+    cancelUniverseRequest();
+
+    setUniverseSource("spotify");
+    setActiveArtist(null);
+    setArtists([]);
+    setError(null);
+    setIsLoading(false);
+    setHasLoaded(false);
+    setSceneVersion((version) => version + 1);
+  }
+
   // Changing the range clears the previous universe.
   function handleTimeRangeChange(nextTimeRange) {
     setTimeRange(nextTimeRange);
@@ -66,7 +106,18 @@ function App() {
 
   // Load the universe for the currently selected range.
   async function handleLoadUniverse() {
-    if (authStatus !== "connected" || isLoading) return;
+    if (
+      universeSource !== "spotify" ||
+      authStatus !== "connected" ||
+      isLoading
+    ) {
+      return;
+    }
+
+    cancelUniverseRequest();
+
+    const controller = new AbortController();
+    universeRequestRef.current = controller;
 
     setIsLoading(true);
     setError(null);
@@ -97,21 +148,29 @@ function App() {
       }
 
       setArtists(data.artists);
+      setActiveArtist(null);
       setHasLoaded(true);
+      setSceneVersion((version) => version + 1);
     } catch (error) {
       console.error("Fetch Error:", error);
       setError("Could not load your universe. Please try again.");
     } finally {
-      setIsLoading(false);
+      if (universeRequestRef.current === controller) {
+        universeRequestRef.current = null;
+        setIsLoading(false);
+      }
     }
   }
 
   return (
     <main>
       <UniverseScene
+        key={`${universeSource}:${timeRange}:${sceneVersion}`}
+        onLoadSampleUniverse={handleLoadSampleUniverse}
+        onUseSpotify={handleUseSpotify}
+        universeSource={universeSource}
         authStatus={authStatus}
         authError={authError}
-        key={timeRange}
         artists={artists}
         activeArtist={activeArtist}
         setActiveArtist={setActiveArtist}

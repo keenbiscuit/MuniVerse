@@ -239,6 +239,9 @@ function UniverseScene({
   error,
   onTimeRangeChange,
   onLoadUniverse,
+  universeSource,
+  onLoadSampleUniverse,
+  onUseSpotify,
 }) {
   // Artist selected in the universe.
   const [selectedArtist, setSelectedArtist] = useState(null);
@@ -517,6 +520,9 @@ function UniverseScene({
         onBackToUniverse={handleBackToUniverse}
         onBackToArtist={handleBackToArtist}
         onBackToSystem={handleBackToSystem}
+        universeSource={universeSource}
+        onLoadSampleUniverse={onLoadSampleUniverse}
+        onUseSpotify={onUseSpotify}
       />
 
       <div className="scene-viewport">

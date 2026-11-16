@@ -17,7 +17,12 @@ export default function UniverseInfoPanel({
   onBackToUniverse,
   onBackToArtist,
   onBackToSystem,
+  universeSource,
+  onLoadSampleUniverse,
+  onUseSpotify,
 }) {
+  const isSample = universeSource === "sample";
+
   const artist = activeArtist ?? selectedArtist ?? startingArtist;
 
   const releases = activeArtist?.releases ?? [];
@@ -57,9 +62,10 @@ export default function UniverseInfoPanel({
       : "";
 
   const releaseType = selectedRelease?.album_type?.replaceAll("_", " ");
-  const trackSpotifyUrl = selectedTrack?.id
-    ? `https://open.spotify.com/track/${encodeURIComponent(selectedTrack.id)}`
-    : null;
+  const trackSpotifyUrl =
+    !isSample && selectedTrack?.id
+      ? `https://open.spotify.com/track/${encodeURIComponent(selectedTrack.id)}`
+      : null;
 
   const spotifyLoginUrl = import.meta.env.DEV
     ? "http://127.0.0.1:8080/oauth2/authorization/spotify"
@@ -81,68 +87,100 @@ export default function UniverseInfoPanel({
         className="universe-info-settings"
         aria-label="Universe settings"
       >
-        <div className="universe-info-connection">
-          {authStatus === "checking" && (
+        {isSample ? (
+          <>
             <p className="universe-info-status" role="status">
-              Checking Spotify connection…
+              Sample universe — fictional artists and songs.
             </p>
-          )}
 
-          {authStatus === "connected" && (
-            <p className="universe-info-status" role="status">
-              Spotify connected
-            </p>
-          )}
+            <button
+              type="button"
+              disabled={Boolean(entryRequest)}
+              onClick={onUseSpotify}
+            >
+              Use Spotify Instead
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="universe-info-connection">
+              {authStatus === "checking" && (
+                <p className="universe-info-status" role="status">
+                  Checking Spotify connection…
+                </p>
+              )}
 
-          {(authStatus === "disconnected" || authStatus === "error") && (
-            <a className="universe-info-spotify-link" href={spotifyLoginUrl}>
-              Connect Spotify
-            </a>
-          )}
+              {authStatus === "connected" && (
+                <p className="universe-info-status" role="status">
+                  Spotify connected
+                </p>
+              )}
 
-          {authError && (
-            <p className="universe-info-error" role="alert">
-              {authError}
-            </p>
-          )}
-        </div>
-        <label htmlFor="time-range">Time range</label>
+              {(authStatus === "disconnected" || authStatus === "error") && (
+                <a
+                  className="universe-info-spotify-link"
+                  href={spotifyLoginUrl}
+                >
+                  Connect Spotify
+                </a>
+              )}
 
-        <select
-          id="time-range"
-          value={timeRange}
-          disabled={isLoading || Boolean(entryRequest)}
-          onChange={(event) => {
-            onTimeRangeChange(event.target.value);
-          }}
-        >
-          <option value="short_term">Short term</option>
-          <option value="medium_term">Medium term</option>
-          <option value="long_term">Long term</option>
-        </select>
+              {authError && (
+                <p className="universe-info-error" role="alert">
+                  {authError}
+                </p>
+              )}
+            </div>
 
-        {!activeArtist && (
-          <button
-            type="button"
-            disabled={
-              isLoading || Boolean(entryRequest) || authStatus !== "connected"
-            }
-            onClick={onLoadUniverse}
-          >
-            {isLoading ? "Loading Universe…" : "Load Universe"}
-          </button>
-        )}
+            <label htmlFor="time-range">Time range</label>
 
-        {isLoading && (
-          <p className="universe-info-status" role="status">
-            Building your universe…
-          </p>
-        )}
+            <select
+              id="time-range"
+              value={timeRange}
+              disabled={isLoading || Boolean(entryRequest)}
+              onChange={(event) => {
+                onTimeRangeChange(event.target.value);
+              }}
+            >
+              <option value="short_term">Short term</option>
+              <option value="medium_term">Medium term</option>
+              <option value="long_term">Long term</option>
+            </select>
 
-        {error && (
-          <p className="universe-info-error" role="alert">
-            {error}
-          </p>
+            {!activeArtist && (
+              <button
+                type="button"
+                disabled={
+                  isLoading ||
+                  Boolean(entryRequest) ||
+                  authStatus !== "connected"
+                }
+                onClick={onLoadUniverse}
+              >
+                {isLoading ? "Loading Universe…" : "Load Universe"}
+              </button>
+            )}
+
+            <button
+              type="button"
+              disabled={Boolean(entryRequest)}
+              onClick={onLoadSampleUniverse}
+            >
+              Explore Sample Universe
+            </button>
+
+            {isLoading && (
+              <p className="universe-info-status" role="status">
+                Building your universe…
+              </p>
+            )}
+
+            {error && (
+              <p className="universe-info-error" role="alert">
+                {error}
+              </p>
+            )}
+          </>
         )}
       </section>
 
@@ -241,8 +279,9 @@ export default function UniverseInfoPanel({
             </dl>
 
             <p>
-              Planet size reflects this song's relative rank-derived weight for
-              the selected time range, not listening minutes.
+              {isSample
+                ? "Planet size uses a fictional sample weight, not Spotify listening data."
+                : "Planet size reflects this song's relative rank-derived weight for the selected time range, not listening minutes."}
             </p>
 
             {trackSpotifyUrl && (
@@ -299,14 +338,26 @@ export default function UniverseInfoPanel({
       )}
 
       <footer className="universe-info-note">
-        <p>Sizes use rank-derived weights, not listening minutes</p>
-        <p>
-          Each time range shows a separate Spotify ranking. Songs and artists
-          may differ between ranges.
-        </p>
-        <p>Short Term: Approx. 4 Weeks</p>
-        <p>Medium Term: Approx. 6 Months</p>
-        <p>Long Term: Approx. 1 Year</p>
+        {isSample ? (
+          <>
+            <p>This universe uses fictional artists, releases, and songs.</p>
+            <p>
+              Sizes use sample weights to demonstrate the visualization. No
+              Spotify connection is required.
+            </p>
+          </>
+        ) : (
+          <>
+            <p>Sizes use rank-derived weights, not listening minutes</p>
+            <p>
+              Each time range shows a separate Spotify ranking. Songs and
+              artists may differ between ranges.
+            </p>
+            <p>Short Term: Approx. 4 Weeks</p>
+            <p>Medium Term: Approx. 6 Months</p>
+            <p>Long Term: Approx. 1 Year</p>
+          </>
+        )}
       </footer>
     </aside>
   );
