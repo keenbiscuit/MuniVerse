@@ -26,6 +26,7 @@ export default function UniverseFlightControls({
   const keysRef = useRef(new Set());
   const dragRef = useRef(null);
   const animationRef = useRef(null);
+  const returnAnimationRef = useRef(null);
   const entryRequestRef = useRef(entryRequest);
 
   const direction = useMemo(() => new Vector3(), []);
@@ -51,9 +52,17 @@ export default function UniverseFlightControls({
 
     const saved = savedViewRef.current;
 
+    returnAnimationRef.current = null;
+
     if (saved?.universeKey === universeKey) {
-      camera.position.fromArray(saved.position);
-      camera.quaternion.fromArray(saved.quaternion);
+      returnAnimationRef.current = {
+        elapsed: 0,
+        duration: 1.25,
+        fromPosition: camera.position.clone(),
+        fromQuaternion: camera.quaternion.clone(),
+        endPosition: new Vector3().fromArray(saved.position),
+        endQuaternion: new Quaternion().fromArray(saved.quaternion),
+      };
     } else {
       camera.position.set(startX, startY, startZ);
       camera.lookAt(targetX, targetY, targetZ);
@@ -65,13 +74,20 @@ export default function UniverseFlightControls({
 
     return () => {
       const animation = animationRef.current;
+      const returnAnimation = returnAnimationRef.current;
 
       // Returning from an artist should restore the view from
       // before the approach, not the camera's final close-up.
       savedViewRef.current = {
         universeKey,
-        position: animation?.returnPosition ?? camera.position.toArray(),
-        quaternion: animation?.returnQuaternion ?? camera.quaternion.toArray(),
+        position:
+          animation?.returnPosition ??
+          returnAnimation?.endPosition.toArray() ??
+          camera.position.toArray(),
+        quaternion:
+          animation?.returnQuaternion ??
+          returnAnimation?.endQuaternion.toArray() ??
+          camera.quaternion.toArray(),
       };
     };
   }, [
@@ -105,7 +121,7 @@ export default function UniverseFlightControls({
       event.preventDefault();
 
       // Do not interfere with the automated galaxy approach.
-      if (entryRequestRef.current) return;
+      if (entryRequestRef.current || returnAnimationRef.current) return;
 
       // Wheel deltas may be measured in pixels, lines, or pages.
       const mode = event.deltaMode;
@@ -154,7 +170,13 @@ export default function UniverseFlightControls({
       // A normal left-click remains available for galaxy entry.
       suppressNextClick = event.shiftKey;
 
-      if (entryRequestRef.current || !event.shiftKey) return;
+      if (
+        entryRequestRef.current ||
+        returnAnimationRef.current ||
+        !event.shiftKey
+      ) {
+        return;
+      }
 
       event.preventDefault();
 
@@ -246,6 +268,45 @@ export default function UniverseFlightControls({
   }, [camera, gl, rotation, wheelDirection]);
 
   useFrame((state, delta) => {
+    const returnAnimation = returnAnimationRef.current;
+
+    if (returnAnimation && !entryRequest) {
+      keysRef.current.clear();
+      dragRef.current = null;
+
+      returnAnimation.elapsed += Math.min(delta, 0.05);
+
+      const progress = Math.min(
+        returnAnimation.elapsed / returnAnimation.duration,
+        1,
+      );
+
+      const eased = progress * progress * (3 - 2 * progress);
+
+      camera.position.lerpVectors(
+        returnAnimation.fromPosition,
+        returnAnimation.endPosition,
+        eased,
+      );
+
+      camera.quaternion.slerpQuaternions(
+        returnAnimation.fromQuaternion,
+        returnAnimation.endQuaternion,
+        eased,
+      );
+
+      if (progress === 1) {
+        returnAnimationRef.current = null;
+      }
+
+      return;
+    }
+
+    // A new artist entry takes priority over an unfinished return.
+    if (entryRequest) {
+      returnAnimationRef.current = null;
+    }
+
     if (entryRequest) {
       let animation = animationRef.current;
 

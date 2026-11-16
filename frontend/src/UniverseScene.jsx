@@ -570,43 +570,46 @@ function UniverseScene({
                   );
                 })}
 
-              {/* Artist view: miniature release systems without point lights. */}
+              {/* Keep releases at the same position and scale when entering a system. */}
               {activeArtist &&
-                !selectedRelease &&
-                releases.map((release, index) => (
-                  <group
-                    key={release.id}
-                    position={getReleasePosition(index)}
-                    scale={RELEASE_OVERVIEW_SCALE}
-                  >
-                    <ReleaseSystem
-                      release={release}
-                      minRadius={MIN_RADIUS}
-                      maxRadius={MAX_RADIUS}
-                      selectedTrackId={null}
-                      onSunClick={() => handleReleaseClick(release)}
-                      onTrackClick={(track) => {
-                        handleReleaseClick(release);
-                        handleTrackClick(track);
-                      }}
-                    />
-                  </group>
-                ))}
+                releases.map((release, index) => {
+                  const isActiveRelease = selectedRelease?.id === release.id;
 
-              {/* Release view: full-size system with local sun illumination. */}
-              {activeArtist && selectedRelease && (
-                <ReleaseSystem
-                  key={selectedRelease.id}
-                  release={selectedRelease}
-                  minRadius={MIN_RADIUS}
-                  maxRadius={MAX_RADIUS}
-                  selectedTrackId={selectedTrack?.id ?? null}
-                  onSunClick={handleBackToSystem}
-                  onTrackClick={handleTrackClick}
-                  illuminate
-                  showSongLabels
-                />
-              )}
+                  if (selectedRelease && !isActiveRelease) return null;
+
+                  return (
+                    <group
+                      key={release.id}
+                      position={getReleasePosition(index)}
+                      scale={RELEASE_OVERVIEW_SCALE}
+                    >
+                      <ReleaseSystem
+                        release={release}
+                        minRadius={MIN_RADIUS}
+                        maxRadius={MAX_RADIUS}
+                        selectedTrackId={
+                          isActiveRelease ? (selectedTrack?.id ?? null) : null
+                        }
+                        onSunClick={() => {
+                          if (isActiveRelease) {
+                            handleBackToSystem();
+                          } else {
+                            handleReleaseClick(release);
+                          }
+                        }}
+                        onTrackClick={(track) => {
+                          if (!isActiveRelease) {
+                            handleReleaseClick(release);
+                          }
+
+                          handleTrackClick(track);
+                        }}
+                        illuminate={isActiveRelease}
+                        showSongLabels={isActiveRelease}
+                      />
+                    </group>
+                  );
+                })}
             </group>
 
             {/* Base lighting remains available in every scene context. */}

@@ -12,17 +12,10 @@ export default function SelectionCameraControls({
 }) {
   const controlsRef = useRef(null);
   const followRef = useRef(null);
-  const framingRef = useRef(null);
-  const hasFramedRef = useRef(false);
+  const releaseApproachRef = useRef(null);
+  const previousViewLevelRef = useRef(null);
 
   const { camera } = useThree();
-
-  // Preserve the incoming viewing direction when OrbitControls first mounts.
-  const initialTarget = useMemo(() => {
-    const direction = camera.getWorldDirection(new Vector3());
-
-    return camera.position.clone().add(direction).toArray();
-  }, [camera]);
 
   const scratch = useMemo(
     () => ({
@@ -30,30 +23,41 @@ export default function SelectionCameraControls({
       worldScale: new Vector3(),
       destination: new Vector3(),
       movement: new Vector3(),
-      direction: new Vector3(),
     }),
     [],
   );
 
-  // Calculate the framing destination and begin a smooth transition.
-  const frameContent = useCallback(() => {
-    const controls = controlsRef.current;
-    const content = contentRef.current;
+  // Frame content immediately, or approach it using the planet-style easing.
+  const frameContent = useCallback(
+    (animate = false) => {
+      const controls = controlsRef.current;
+      const content = contentRef.current;
 
-    if (!controls || !content) return;
+      if (!controls || !content) return;
 
-    content.updateWorldMatrix(true, true);
+      releaseApproachRef.current = null;
 
-    const bounds = new Box3().setFromObject(content);
+      controls.enabled = true;
+      controls.enablePan = true;
+      controls.minDistance = 0.1;
+      controls.maxDistance = Infinity;
 
-    let endTarget;
-    let endPosition;
-    let far = 2000;
+      content.updateWorldMatrix(true, true);
 
-    if (bounds.isEmpty()) {
-      endTarget = new Vector3(0, 0, 0);
-      endPosition = new Vector3(0, 0, 40);
-    } else {
+      const bounds = new Box3().setFromObject(content);
+
+      if (bounds.isEmpty()) {
+        controls.target.set(0, 0, 0);
+
+        camera.position.set(0, 0, 40);
+        camera.near = 0.1;
+        camera.far = 2000;
+        camera.updateProjectionMatrix();
+
+        controls.update();
+        return;
+      }
+
       const sphere = bounds.getBoundingSphere(new Sphere());
 
       const verticalHalfFov = MathUtils.degToRad(camera.fov / 2);
@@ -67,55 +71,61 @@ export default function SelectionCameraControls({
       const radius = Math.max(sphere.radius, 1);
       const distance = (radius / Math.sin(limitingHalfFov)) * 1.2;
 
-      endTarget = sphere.center.clone();
+      camera.near = 0.1;
+      camera.far = Math.max(2000, distance + radius * 10);
+      camera.updateProjectionMatrix();
 
-      endPosition = sphere.center.clone().add(new Vector3(0, 0, distance));
+      if (animate) {
+        // Preserve the current viewing direction, as planet approach does.
+        const offset = camera.position.clone().sub(controls.target);
 
-      far = Math.max(2000, distance + radius * 10);
-    }
+        if (offset.lengthSq() < 0.0001) {
+          offset.set(0, 0, 1);
+        }
 
-    const startPosition = camera.position.clone();
-    const startTarget = controls.target.clone();
+        offset.normalize().multiplyScalar(distance);
 
-    // On entry, retain the incoming camera direction while giving the
-    // temporary target a useful distance for interpolation.
-    if (!hasFramedRef.current) {
-      camera.getWorldDirection(scratch.direction);
+        releaseApproachRef.current = {
+          elapsed: 0,
+          duration: 1.25,
+          startPosition: camera.position.clone(),
+          startTarget: controls.target.clone(),
+          endPosition: sphere.center.clone().add(offset),
+          endTarget: sphere.center.clone(),
+        };
 
-      const targetDistance = Math.max(camera.position.distanceTo(endTarget), 1);
+        controls.enabled = false;
+        return;
+      }
 
-      startTarget
-        .copy(camera.position)
-        .addScaledVector(scratch.direction, targetDistance);
+      controls.target.copy(sphere.center);
 
-      controls.target.copy(startTarget);
-      hasFramedRef.current = true;
-    }
+      camera.position.set(
+        sphere.center.x,
+        sphere.center.y,
+        sphere.center.z + distance,
+      );
 
-    framingRef.current = {
-      elapsed: 0,
-      duration: 1.25,
-      startPosition,
-      startTarget,
-      endPosition,
-      endTarget,
-    };
+      controls.update();
+    },
+    [camera, contentRef],
+  );
 
-    controls.enabled = false;
-    controls.enablePan = true;
-    controls.minDistance = 0.1;
-    controls.maxDistance = Infinity;
-
-    camera.near = 0.1;
-    camera.far = far;
-    camera.updateProjectionMatrix();
-  }, [camera, contentRef, scratch]);
-
-  // Navigation starts a framing transition, not an immediate reposition.
+  // Only release entry gets the new approach.
+  // Artist entry retains the original framing behavior.
   useEffect(() => {
+    const previousViewLevel = previousViewLevelRef.current;
+
     followRef.current = null;
-    frameContent();
-  }, [frameContent, viewKey, viewData]);
+
+    const shouldAnimate =
+      viewLevel === "release" ||
+      (viewLevel === "artist" && previousViewLevel === "release");
+
+    frameContent(shouldAnimate);
+
+    previousViewLevelRef.current = viewLevel;
+  }, [frameContent, viewLevel, viewKey, viewData]);
 
   useFrame((state, delta) => {
     const controls = controlsRef.current;
@@ -126,53 +136,53 @@ export default function SelectionCameraControls({
     const shouldFollow = viewLevel === "release" && selectedTrackId != null;
 
     if (!shouldFollow) {
-      // Leaving planet inspection smoothly reframes the release.
+      // Preserve the original behavior when leaving planet inspection.
       if (followRef.current) {
         followRef.current = null;
-        frameContent();
+        frameContent(true);
       }
 
-      const framing = framingRef.current;
+      const approach = releaseApproachRef.current;
 
-      if (!framing) return;
+      if (!approach) return;
 
-      framing.elapsed += Math.min(delta, 0.05);
+      approach.elapsed += Math.min(delta, 0.05);
 
-      const progress = Math.min(framing.elapsed / framing.duration, 1);
+      const progress = Math.min(approach.elapsed / approach.duration, 1);
 
       const eased = progress * progress * (3 - 2 * progress);
 
       camera.position.lerpVectors(
-        framing.startPosition,
-        framing.endPosition,
+        approach.startPosition,
+        approach.endPosition,
         eased,
       );
 
       controls.target.lerpVectors(
-        framing.startTarget,
-        framing.endTarget,
+        approach.startTarget,
+        approach.endTarget,
         eased,
       );
 
       controls.update();
 
       if (progress === 1) {
-        framingRef.current = null;
+        releaseApproachRef.current = null;
         controls.enabled = true;
       }
 
       return;
     }
 
-    // Planet selection takes priority over a framing transition.
-    framingRef.current = null;
+    // A planet click takes priority over release framing.
+    releaseApproachRef.current = null;
 
     let follow = followRef.current;
 
+    // A different selected track starts a fresh approach.
     if (!follow || follow.trackId !== selectedTrackId) {
       const mesh = content.getObjectByName(`song-planet-${selectedTrackId}`);
 
-      // Wait until the selected planet exists in the scene.
       if (!mesh) return;
 
       mesh.getWorldPosition(scratch.worldPosition);
@@ -198,7 +208,7 @@ export default function SelectionCameraControls({
 
       const approachDistance = (worldRadius / Math.sin(limitingHalfFov)) * 1.4;
 
-      // Preserve the current viewing direction during planet approach.
+      // Preserve the current viewing direction during the approach.
       const offset = camera.position.clone().sub(controls.target);
 
       if (offset.lengthSq() < 0.0001) {
@@ -237,7 +247,7 @@ export default function SelectionCameraControls({
 
       const eased = progress * progress * (3 - 2 * progress);
 
-      // Continue approaching the planet as it moves along its orbit.
+      // The destination follows the planet during the approach.
       scratch.destination.copy(scratch.worldPosition).add(follow.offset);
 
       camera.position.lerpVectors(
@@ -265,7 +275,7 @@ export default function SelectionCameraControls({
       return;
     }
 
-    // Preserve the user's orbit angle and zoom while following the planet.
+    // Preserve the user's orbit angle and zoom while following.
     scratch.movement.copy(scratch.worldPosition).sub(follow.previousPosition);
 
     camera.position.add(scratch.movement);
@@ -276,12 +286,5 @@ export default function SelectionCameraControls({
     controls.update();
   });
 
-  return (
-    <OrbitControls
-      ref={controlsRef}
-      target={initialTarget}
-      makeDefault
-      enableDamping={false}
-    />
-  );
+  return <OrbitControls ref={controlsRef} makeDefault enableDamping={false} />;
 }
